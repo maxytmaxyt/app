@@ -12,18 +12,27 @@ jobs:
       contents: write
 
     steps:
-      - name: Checkout Repository
+      # --------------------
+      # 🔄 Checkout Repository
+      # --------------------
+      - name: 📥 Checkout Repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Set up JDK 17
+      # --------------------
+      # ☕ Setup JDK
+      # --------------------
+      - name: ☕ Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Cache Gradle
+      # --------------------
+      # 📦 Gradle Cache
+      # --------------------
+      - name: ⚡ Cache Gradle
         uses: actions/cache@v4
         with:
           path: |
@@ -33,28 +42,56 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      - name: Check Gradle Wrapper
+      # --------------------
+      # 🏷 Calculate Version
+      # --------------------
+      - name: 🔢 Calculate Version
+        id: version
+        run: |
+          git fetch --tags
+          LAST_TAG=$(git tag --list "v*" --sort=-v:refname | head -n 1)
+          if [ -z "$LAST_TAG" ]; then
+            MAJOR=0; MINOR=1; PATCH=0
+          else
+            IFS='.' read -r MAJOR MINOR PATCH <<< "${LAST_TAG#v}"
+            PATCH=$((PATCH + 1))
+          fi
+          VERSION="v$MAJOR.$MINOR.$PATCH"
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "version=${VERSION#v}" >> $GITHUB_ENV
+          echo "✅ Version berechnet: $VERSION"
+
+      # --------------------
+      # 🔧 Check Gradle Wrapper
+      # --------------------
+      - name: 🏗️ Ensure Gradle Wrapper
         run: |
           if [ ! -f "./gradlew" ]; then
-            echo "Wrapper fehlt – erstelle gradlew..."
+            echo "🚀 Wrapper fehlt – erstelle gradlew..."
             gradle wrapper --gradle-version 8.4
             chmod +x gradlew
 
-            # Wrapper ins Repo committen
+            echo "💾 Commit Wrapper ins Repo..."
             git config --global user.name "github-actions[bot]"
             git config --global user.email "github-actions[bot]@users.noreply.github.com"
             git add gradlew gradlew.bat gradle/wrapper/*
             git commit -m "chore: add Gradle wrapper [skip ci]" || echo "Nothing to commit"
             git push
           else
-            echo "Wrapper vorhanden ✅"
+            echo "✅ Wrapper vorhanden"
           fi
 
-      - name: Build Debug APK
+      # --------------------
+      # 🏗️ Build APK
+      # --------------------
+      - name: 📦 Build Debug APK
         run: ./gradlew assembleDebug
 
-      - name: Upload APK
+      # --------------------
+      # 📤 Upload APK
+      # --------------------
+      - name: 🚀 Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: DeviceInfoApp-APK
+          name: DeviceInfoApp-${{ env.VERSION }}
           path: app/build/outputs/apk/debug/app-debug.apk
