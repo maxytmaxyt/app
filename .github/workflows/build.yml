@@ -43,7 +43,7 @@ jobs:
             ${{ runner.os }}-gradle-
 
       # --------------------
-      # 🏷 Calculate Version & Update Files
+      # 🏷 Bump Version & Update Files
       # --------------------
       - name: 🔢 Bump Version
         id: version
@@ -62,23 +62,32 @@ jobs:
 
           VERSION="v$MAJOR.$MINOR.$PATCH"
           echo "✅ Neue Version: $VERSION"
-
-          # In GITHUB_ENV speichern
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "version=${VERSION#v}" >> $GITHUB_ENV
 
           # --------------------
-          # ✍️ In gradle.properties schreiben
+          # ✍️ Gradle.properties aktualisieren (ohne andere Zeilen zu löschen)
           # --------------------
-          sed -i "s/^versionCode .*/versionCode $PATCH/" app/build.gradle || echo "No versionCode found"
-          sed -i "s/^versionName .*/versionName \"${VERSION#v}\"/" app/build.gradle || echo "No versionName found"
+          # AndroidX Flags sicherstellen
+          grep -qxF "android.useAndroidX=true" gradle.properties || echo "android.useAndroidX=true" >> gradle.properties
+          grep -qxF "android.enableJetifier=true" gradle.properties || echo "android.enableJetifier=true" >> gradle.properties
 
-          echo "💾 Version in build.gradle aktualisiert"
+          # Version setzen oder ersetzen
+          if grep -q "^version=" gradle.properties; then
+            sed -i "s/^version=.*/version=${VERSION#v}/" gradle.properties
+          else
+            echo "version=${VERSION#v}" >> gradle.properties
+          fi
 
-          # Optional: gradle.properties updaten
-          echo "version=${VERSION#v}" > gradle.properties
+          # --------------------
+          # ✍️ build.gradle VersionName & VersionCode setzen
+          # --------------------
+          sed -i "s/versionCode [0-9]\+/versionCode $PATCH/" app/build.gradle || echo "versionCode $PATCH" >> app/build.gradle
+          sed -i "s/versionName \".*\"/versionName \"${VERSION#v}\"/" app/build.gradle || echo "versionName \"${VERSION#v}\"" >> app/build.gradle
 
-          # Commit und Push
+          # --------------------
+          # 💾 Commit + Tag
+          # --------------------
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add gradle.properties app/build.gradle
